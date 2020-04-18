@@ -16,6 +16,7 @@
 
 from game import Directions, Actions
 import util
+from pacman import PacmanRules
 
 class FeatureExtractor:
     def getFeatures(self, state, action):
@@ -143,25 +144,29 @@ class NewExtractor(FeatureExtractor):
             # will diverge wildly
             features["closest-food"] = float(dist) / (walls.width * walls.height)
 
+        def manhattanDistance( pos1, pos2 ):
+            return abs( pos1[0] - pos2[0] ) + abs( pos1[1] - pos2[1] )
+
+        
         # closest scared ghosts feature
         scared_ghosts = list(filter(lambda x: x.scaredTimer != 0, state.getGhostStates()))
         if scared_ghosts:
             scared_ghosts_manhattan_distances = list(map(lambda x: manhattanDistance(state.getPacmanPosition(), x.getPosition()), scared_ghosts))
             closest_distance_scared_ghosts = min(scared_ghosts_manhattan_distances)
-            feature["closest_scared_ghosts"] = closest_distance_scared_ghosts
+            features["closest_scared_ghosts"] = closest_distance_scared_ghosts
 
         # inverse closest active ghosts feature
         active_ghosts = list(filter(lambda x: x.scaredTimer == 0, state.getGhostStates()))
         if active_ghosts:
             active_ghosts_manhattan_distances = list(map(lambda x: manhattanDistance(state.getPacmanPosition(), x.getPosition()), active_ghosts))
             closest_distance_active_ghosts = min(active_ghosts_manhattan_distances)
-            feature["inverse_closest_active_ghosts"] = 1 / closest_distance_active_ghosts
+            if closest_distance_active_ghosts != 0:
+                features["inverse_closest_active_ghosts"] = 1 / closest_distance_active_ghosts
 
         features.divideAll(10.0)
         return features
 
-    def manhattanDistance( pos1, pos2 ):
-        return abs( pos1[0] - pos2[0] ) + abs( pos1[1] - pos2[1] )
+    
 
 
         
