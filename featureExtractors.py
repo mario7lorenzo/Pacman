@@ -16,6 +16,7 @@
 
 from game import Directions, Actions
 import util
+import copy
 
 class FeatureExtractor:
     def getFeatures(self, state, action):
@@ -74,6 +75,7 @@ class SimpleExtractor(FeatureExtractor):
 
     def getFeatures(self, state, action):
         # extract the grid of food and wall locations and get the ghost locations
+        print(state.getGhostStates())
         food = state.getFood()
         walls = state.getWalls()
         ghosts = state.getGhostPositions()
@@ -107,8 +109,61 @@ class NewExtractor(FeatureExtractor):
     Design you own feature extractor here. You may define other helper functions you find necessary.
     """
     def getFeatures(self, state, action):
-        "*** YOUR CODE HERE ***"
-        pass
+        food = state.getFood()
+        walls = state.getWalls()
+        ghosts = state.getGhostPositions()
+        features = util.Counter()
+
+        features["bias"] = 1.0
+
+        # compute the location of pacman after action
+        x, y = state.getPacmanPosition()
+        dx, dy = Actions.directionToVector(action)
+        next_x, next_y = int(x + dx), int(y + dy)
+
+        # feature for number of ghosts 1-step away
+        features["#-of-ghosts-1-step-away"] = sum((next_x, next_y) in Actions.getLegalNeighbors(g, walls) for g in ghosts)
+
+        # feature for number of ghosts 2-steps away
+        features["#-of-ghosts-2-steps-away"] = 0.0
+        copied_state = state.deepCopy()
+        PacmanRules.applyAction(copied_state, action)
+        next_legal_actions = copied_state.getLegalPacmanActions()
+
+        for next_action in next_legal_actions:
+            next_dx, next_dy = Actions.directionToVector(next_action)
+            next_next_x, next_next_y = int(next_x + next_dx), int(next_y + next_dy)
+            features["#-of-ghosts-2-steps-away"] += sum((next_next_x, next_next_y) in Actions.getLegalNeighbors(g, walls) for g in ghosts)
+
+        if not features["#-of-ghosts-1-step-away"] and food[next_x][next_y]:
+            features["eats-food"] = 1.0
+
+        # closest food feature
+        dist = closestFood((next_x, next_y), food, walls)
+        if dist is not None:
+            # make the distance a number less than one otherwise the update
+            # will diverge wildly
+            features["closest-food"] = float(dist) / (walls.width * walls.height)
+
+        # closest scared ghosts feature
+        scared_ghosts = list(filter(lambda x: x.scaredTimer != 0, state.getGhostStates()))
+        if scared_ghosts:
+            scared_ghosts_manhattan_distances = list(map(lambda x: manhattanDistance(state.getPacmanPosition(), x.getPosition()), scared_ghosts))
+            closest_distance_scared_ghosts = min(scared_ghosts_manhattan_distances)
+            feature["closest_scared_ghosts"] = closest_distance_scared_ghosts
+
+        # inverse closest active ghosts feature
+        active_ghosts = list(filter(lambda x: x.scaredTimer == 0, state.getGhostStates()))
+        if active_ghosts:
+            active_ghosts_manhattan_distances = list(map(lambda x: manhattanDistance(state.getPacmanPosition(), x.getPosition()), active_ghosts))
+            closest_distance_active_ghosts = min(active_ghosts_manhattan_distances)
+            feature["inverse_closest_active_ghosts"] = 1 / closest_distance_active_ghosts
+
+        features.divideAll(10.0)
+        return features
+
+    def manhattanDistance( pos1, pos2 ):
+        return abs( pos1[0] - pos2[0] ) + abs( pos1[1] - pos2[1] )
 
 
         
